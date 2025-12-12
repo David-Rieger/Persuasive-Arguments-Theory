@@ -1,0 +1,35 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Persuasive Arguments Theory
+message: >-
+  If you use this theory, please cite it using the  
+  metadata from this file.
+type: software
+authors:
+  - given-names: Caspar
+    family-names: Schumacher
+    email: C.Schumacher@campus.lmu.de
+  - given-names: Lorea
+    family-names: Ufer
+    email: L.Ufer@campus.lmu.de
+  - given-names: Elisa
+    family-names: Niesner
+    email: elisa.niesner@campus.lmu.de
+  - given-names: David
+    family-names: Rieger
+    email: David.Rieger@campus.lmu.de
+repository-code: >-
+  https://github.com/David-Rieger/Persuasive-Arguments-Theory
+abstract: >-
+  A formal model that explains group polarization as a
+  result of persuasive arguments in group discussions.
+keywords:
+  - fairtheory
+  - formal theory
+  - persuasive arguments theory
+  - group polarization
+license: CC-BY-4.0
+version: 0.1.0
+date-released: '2025-12-12'
