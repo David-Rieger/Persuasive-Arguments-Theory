@@ -34,21 +34,13 @@ create_pool <- function(pool_size, pool_bias) {
 #'
 #' @param arguments Numeric vector. The arguments currently held by the agent.
 #' @param C Numeric. The uncertainty/damping factor. Must be >= 0.
-#'        \itemize{
-#'          \item \code{C = 0} (Default): The assumption is inactive. Calculates the standard arithmetic mean.
-#'          \item \code{C > 0}: The assumption is active. The value is dampened towards 0 when N is small.
-#'        }
+#'        C = 0 (Default): The assumption is inactive. Calculates the standard arithmetic mean.
+#'        C > 0: The assumption is active. The value is dampened towards 0 when N is small.
 #'
 #' @return Numeric value between -1 and 1 representing the opinion tendency.
 
 calc_tendency <- function(arguments, C = 0) {
   n <- length(arguments)
-  
-  # Validate C
-  if (C < 0) stop("C must be non-negative (>= 0).")
-  
-  # Safety check for empty set with no damping
-  if (n == 0 && C == 0) return(0)
   
   # Unified Formula: Sum of values divided by (Number of arguments + C)
   numerator <- sum(arguments)
@@ -195,3 +187,61 @@ run_simulation <- function(n_agents = 10,
     Group_Polarization = gp
   )
 }
+
+## Simulation
+
+run_simulation(n_agents = 5,
+               pool_size = 20,
+               pool_bias = 0.4,
+               n_IA = 2,
+               n_AA = 3,
+               C = 5)
+
+#' Repeat PAT Simulation (Robust Version)
+#' 
+#' Verwendet do.call, um Argumente sicher zu übergeben.
+#'
+#' @param n_runs Integer. Anzahl der Wiederholungen.
+#' @param ... Argumente für run_simulation (z.B. n_agents, pool_bias).
+
+repeat_simulation <- function(n_runs = 100, ...) {
+  
+  # 1. Wir fangen alle Argumente (n_agents, C, etc.) explizit in einer Liste auf
+  args_list <- list(...)
+  
+  # 2. Wir nutzen lapply statt replicate für bessere Kontrolle
+  # (lapply läuft n_runs mal durch)
+  results_list <- lapply(1:n_runs, function(dummy_index) {
+    
+    # do.call führt "run_simulation" aus und übergibt die Argumenten-Liste exakt
+    sim <- do.call(run_simulation, args_list)
+    
+    return(sim$Group_Polarization)
+  })
+  
+  # 3. Ergebnisse in einen Vektor umwandeln
+  all_gps <- unlist(results_list)
+  
+  # 4. Zusammenfassung
+  summary_stats <- c(
+    Mean = mean(all_gps),
+    SD = sd(all_gps),
+    Min = min(all_gps),
+    Max = max(all_gps)
+  )
+  
+  return(list(
+    all_gp_values = all_gps,
+    summary = summary_stats
+  ))
+}
+
+## Simulation
+
+repeat_simulation(n_runs = 100, 
+                  n_agents = 5,
+                  pool_size = 20,
+                  pool_bias = 0.4,
+                  n_IA = 2,
+                  n_AA = 3,
+                  C = 3)
