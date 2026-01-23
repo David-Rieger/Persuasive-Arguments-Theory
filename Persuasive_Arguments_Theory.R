@@ -188,60 +188,142 @@ run_simulation <- function(n_agents = 10,
   )
 }
 
-## Simulation
-
-run_simulation(n_agents = 5,
-               pool_size = 20,
-               pool_bias = 0.4,
-               n_IA = 2,
-               n_AA = 3,
-               C = 5)
-
-#' Repeat PAT Simulation (Robust Version)
-#' 
-#' Verwendet do.call, um Argumente sicher zu übergeben.
+#' Simulate Full Experiment (Multi-Group)
 #'
-#' @param n_runs Integer. Anzahl der Wiederholungen.
-#' @param ... Argumente für run_simulation (z.B. n_agents, pool_bias).
-
-repeat_simulation <- function(n_runs = 100, ...) {
+#' Simulates a complete experiment comprising multiple independent groups,
+#' mirroring the design of studies like Moscovici & Zavalloni (1969).
+#' It aggregates individual-level data from all groups into a single dataset
+#' suitable for statistical hypothesis testing (e.g., t-test).
+#'
+#' @param n_groups Integer. Number of independent groups to simulate (e.g., 10).
+#' @param n_agents_per_group Integer. Number of agents per group (e.g., 4).
+#' @param ... Additional arguments passed to run_simulation (e.g., pool_bias, C).
+#'
+#' @return A data frame containing data for all agents across all groups,
+#'         including a 'GroupID' column.
+simulate_experiment <- function(n_groups = 10, n_agents_per_group = 4, ...) {
   
-  # 1. Wir fangen alle Argumente (n_agents, C, etc.) explizit in einer Liste auf
+  # List to store result dataframes from each group
+  all_data_list <- list()
+  
+  # Argument list for do.call
   args_list <- list(...)
+  # Add the specific n_agents for this wrapper
+  args_list$n_agents <- n_agents_per_group
   
-  # 2. Wir nutzen lapply statt replicate für bessere Kontrolle
-  # (lapply läuft n_runs mal durch)
-  results_list <- lapply(1:n_runs, function(dummy_index) {
+  for (g in 1:n_groups) {
+    # Run simulation for one group
+    # do.call is used to pass the variable arguments (...) cleanly
+    sim_result <- do.call(run_simulation, args_list)
     
-    # do.call führt "run_simulation" aus und übergibt die Argumenten-Liste exakt
-    sim <- do.call(run_simulation, args_list)
+    # Extract individual data
+    df <- sim_result$Individual_Data
     
-    return(sim$Group_Polarization)
-  })
+    # Add GroupID to distinguish this group's members
+    df$GroupID <- g
+    
+    # Store in list
+    all_data_list[[g]] <- df
+  }
   
-  # 3. Ergebnisse in einen Vektor umwandeln
-  all_gps <- unlist(results_list)
+  # Merge all group dataframes into one large dataset
+  full_dataset <- do.call(rbind, all_data_list)
   
-  # 4. Zusammenfassung
-  summary_stats <- c(
-    Mean = mean(all_gps),
-    SD = sd(all_gps),
-    Min = min(all_gps),
-    Max = max(all_gps)
-  )
-  
-  return(list(
-    all_gp_values = all_gps,
-    summary = summary_stats
-  ))
+  return(full_dataset)
 }
 
 ## Simulation
 
-repeat_simulation(n_runs = 100, 
-                  n_agents = 5,
-                  pool_size = 20,
-                  pool_bias = 0.4,
-                  n_IA = 2,
-                  n_AA = 3,
-                  C = 3)
+# Simulation of the original study
+
+set.seed(111)
+
+simulation_results <- simulate_experiment(n_groups = 10, 
+                    n_agents_per_group = 4,
+                    pool_size = 1000,
+                    pool_bias = 0.4,
+                    n_IA = 4,
+                    n_AA = 12,
+                    C = 0)
+
+t.test(simulation_results$T_post, simulation_results$T_pre, paired = TRUE)
+
+# Simulation with higher N
+
+set.seed(111)
+
+simulation_higherN <- simulate_experiment(n_groups = 50, 
+                                          n_agents_per_group = 10,
+                                          pool_size = 1000,
+                                          pool_bias = 0.4,
+                                          n_IA = 4,
+                                          n_AA = 12,
+                                          C = 0)
+
+t.test(simulation_higherN$T_post, simulation_higherN$T_pre, paired = TRUE)
+
+# Simulation with dampness factor C
+
+set.seed(111)
+
+simulation_C <- simulate_experiment(n_groups = 50, 
+                                          n_agents_per_group = 10,
+                                          pool_size = 1000,
+                                          pool_bias = 0.4,
+                                          n_IA = 4,
+                                          n_AA = 12,
+                                          C = 4)
+
+t.test(simulation_C$T_post, simulation_C$T_pre, paired = TRUE)
+
+## Plots
+
+# 2. Datenvorbereitung
+# WICHTIG: Da AgentID in jeder Gruppe "1, 2, 3, 4" heißt, müssen wir eine 
+# "Unique ID" bauen, damit ggplot weiß, welche Punkte zusammengehören.
+plot_data <- experiment_data %>%
+  mutate(UniqueAgentID = paste0("G", GroupID, "_A", AgentID)) %>%
+  pivot_longer(cols = c("T_pre", "T_post"), 
+               names_to = "Timepoint", 
+               values_to = "Tendency") %>%
+  # Faktor-Level ordnen, damit "Pre" links und "Post" rechts steht
+  mutate(Timepoint = factor(Timepoint, levels = c("T_pre", "T_post")))
+
+# 3. Aggregierte Daten für die "Durchschnittslinie" (Group Polarization)
+summary_data <- plot_data %>%
+  group_by(Timepoint) %>%
+  summarise(Tendency = mean(Tendency)) %>%
+  mutate(UniqueAgentID = "MEAN") # Dummy ID
+
+# 4. Der "Paired Slopegraph"
+ggplot(plot_data, aes(x = Timepoint, y = Tendency)) +
+  
+  # A) Die individuellen Linien (Choice Shifts)
+  # Wir gruppieren nach UniqueAgentID, damit Pre und Post verbunden werden
+  geom_line(aes(group = UniqueAgentID), color = "grey70", alpha = 0.4) +
+  geom_point(color = "grey50", size = 1.5, alpha = 0.6) +
+  
+  # B) Die globale Gruppe-Effekt Linie (Group Polarization)
+  # Diese Linie wird fett und rot gezeichnet
+  geom_line(data = summary_data, aes(group = 1), color = "darkred", size = 2) +
+  geom_point(data = summary_data, color = "darkred", size = 4) +
+  
+  # C) Beschriftung und Limits
+  scale_y_continuous(limits = c(-1, 1)) +
+  labs(
+    title = "Visualization of Paired Design: Individual vs. Group Effect",
+    subtitle = "Grey lines = Individual Choice Shifts (N=40) | Red line = Mean Group Polarization",
+    x = "Experimental Phase",
+    y = "Opinion Tendency (-1 to +1)"
+  ) +
+  
+  # D) Styling
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    axis.text.x = element_text(size = 12, face = "bold")
+  )
+
+
+
+
