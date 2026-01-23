@@ -278,52 +278,43 @@ t.test(simulation_C$T_post, simulation_C$T_pre, paired = TRUE)
 
 ## Plots
 
-# 2. Datenvorbereitung
-# WICHTIG: Da AgentID in jeder Gruppe "1, 2, 3, 4" heißt, müssen wir eine 
-# "Unique ID" bauen, damit ggplot weiß, welche Punkte zusammengehören.
-plot_data <- experiment_data %>%
-  mutate(UniqueAgentID = paste0("G", GroupID, "_A", AgentID)) %>%
-  pivot_longer(cols = c("T_pre", "T_post"), 
-               names_to = "Timepoint", 
-               values_to = "Tendency") %>%
-  # Faktor-Level ordnen, damit "Pre" links und "Post" rechts steht
-  mutate(Timepoint = factor(Timepoint, levels = c("T_pre", "T_post")))
 
-# 3. Aggregierte Daten für die "Durchschnittslinie" (Group Polarization)
-summary_data <- plot_data %>%
-  group_by(Timepoint) %>%
-  summarise(Tendency = mean(Tendency)) %>%
-  mutate(UniqueAgentID = "MEAN") # Dummy ID
+# ----------------------------------------
+# 1. Vorher- und Nachher-Vektoren extrahieren
+# ----------------------------------------
+T_pre  <- simulation_C$T_pre
+T_post <- simulation_C$T_post
 
-# 4. Der "Paired Slopegraph"
-ggplot(plot_data, aes(x = Timepoint, y = Tendency)) +
-  
-  # A) Die individuellen Linien (Choice Shifts)
-  # Wir gruppieren nach UniqueAgentID, damit Pre und Post verbunden werden
-  geom_line(aes(group = UniqueAgentID), color = "grey70", alpha = 0.4) +
-  geom_point(color = "grey50", size = 1.5, alpha = 0.6) +
-  
-  # B) Die globale Gruppe-Effekt Linie (Group Polarization)
-  # Diese Linie wird fett und rot gezeichnet
-  geom_line(data = summary_data, aes(group = 1), color = "darkred", size = 2) +
-  geom_point(data = summary_data, color = "darkred", size = 4) +
-  
-  # C) Beschriftung und Limits
-  scale_y_continuous(limits = c(-1, 1)) +
-  labs(
-    title = "Visualization of Paired Design: Individual vs. Group Effect",
-    subtitle = "Grey lines = Individual Choice Shifts (N=40) | Red line = Mean Group Polarization",
-    x = "Experimental Phase",
-    y = "Opinion Tendency (-1 to +1)"
-  ) +
-  
-  # D) Styling
-  theme_minimal() +
-  theme(
-    plot.title = element_text(face = "bold"),
-    axis.text.x = element_text(size = 12, face = "bold")
-  )
+# ----------------------------------------
+# 2. Mittelwerte berechnen
+# ----------------------------------------
+mean_pre  <- mean(T_pre)
+mean_post <- mean(T_post)
 
+# ----------------------------------------
+# 3. Boxplot mit Mittelwertpunkten und Hintergrundlinien
+# ----------------------------------------
+boxplot(T_pre, T_post,
+        names = c("T_pre", "T_post"),
+        ylab = "Messwert",
+        main = "Boxplot Vorher vs Nachher",
+        ylim = c(-1, 1),    # Y-Achse von -1 bis 1
+        yaxt = "n",         # eigene Achse setzen
+        col = "lightgray",
+        border = "black"
+)
 
+# Y-Achse manuell bei −1, −0.75, ..., 1
+axis(side = 2, at = seq(-1, 1, by = 0.25), las = 1)
 
+# Hintergrundlinien wie zuvor (leicht grau, gestrichelt)
+abline(h = seq(-1, 1, by = 0.1), col = "lightgray", lty = 2)
+
+# Mittelwertpunkte hinzufügen
+points(1, mean_pre,  pch = 19, col = "red", cex = 2)  # Mittelwert T_pre
+points(2, mean_post, pch = 19, col = "red", cex = 2)  # Mittelwert T_post
+
+# Optional: Mittelwerte beschriften
+text(1, mean_pre,  labels = round(mean_pre,2),  col = "red", pos = 3)
+text(2, mean_post, labels = round(mean_post,2), col = "red", pos = 3)
 
