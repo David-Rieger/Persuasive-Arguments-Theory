@@ -1,6 +1,10 @@
 # ==============================================================================
-# Persuasive Arguments Theory (PAT) Simulation Module
+# Persuasive Arguments Theory (PAT) Simulation Module - FUNCTIONS
 # ==============================================================================
+
+library(ggplot2)
+library(tidyr)
+library(dplyr)
 
 #' Create Group Argument Pool
 #'
@@ -231,90 +235,3 @@ simulate_experiment <- function(n_groups = 10, n_agents_per_group = 4, ...) {
   
   return(full_dataset)
 }
-
-## Simulation
-
-# Simulation of the original study
-
-set.seed(111)
-
-simulation_results <- simulate_experiment(n_groups = 10, 
-                    n_agents_per_group = 4,
-                    pool_size = 1000,
-                    pool_bias = 0.4,
-                    n_IA = 4,
-                    n_AA = 12,
-                    C = 0)
-
-t.test(simulation_results$T_post, simulation_results$T_pre, paired = TRUE)
-
-# Simulation with higher N
-
-set.seed(111)
-
-simulation_higherN <- simulate_experiment(n_groups = 50, 
-                                          n_agents_per_group = 10,
-                                          pool_size = 1000,
-                                          pool_bias = 0.4,
-                                          n_IA = 4,
-                                          n_AA = 12,
-                                          C = 0)
-
-t.test(simulation_higherN$T_post, simulation_higherN$T_pre, paired = TRUE)
-
-# Simulation with dampness factor C
-
-set.seed(111)
-
-simulation_C <- simulate_experiment(n_groups = 50, 
-                                          n_agents_per_group = 10,
-                                          pool_size = 1000,
-                                          pool_bias = 0.4,
-                                          n_IA = 4,
-                                          n_AA = 12,
-                                          C = 4)
-
-t.test(simulation_C$T_post, simulation_C$T_pre, paired = TRUE)
-
-## Plots
-
-
-# ----------------------------------------
-# 1. Vorher- und Nachher-Vektoren extrahieren
-# ----------------------------------------
-T_pre  <- simulation_C$T_pre
-T_post <- simulation_C$T_post
-
-# ----------------------------------------
-# 2. Mittelwerte berechnen
-# ----------------------------------------
-mean_pre  <- mean(T_pre)
-mean_post <- mean(T_post)
-
-# ----------------------------------------
-# 3. Boxplot mit Mittelwertpunkten und Hintergrundlinien
-# ----------------------------------------
-boxplot(T_pre, T_post,
-        names = c("T_pre", "T_post"),
-        ylab = "Messwert",
-        main = "Boxplot Vorher vs Nachher",
-        ylim = c(-1, 1),    # Y-Achse von -1 bis 1
-        yaxt = "n",         # eigene Achse setzen
-        col = "lightgray",
-        border = "black"
-)
-
-# Y-Achse manuell bei −1, −0.75, ..., 1
-axis(side = 2, at = seq(-1, 1, by = 0.25), las = 1)
-
-# Hintergrundlinien wie zuvor (leicht grau, gestrichelt)
-abline(h = seq(-1, 1, by = 0.1), col = "lightgray", lty = 2)
-
-# Mittelwertpunkte hinzufügen
-points(1, mean_pre,  pch = 19, col = "red", cex = 2)  # Mittelwert T_pre
-points(2, mean_post, pch = 19, col = "red", cex = 2)  # Mittelwert T_post
-
-# Optional: Mittelwerte beschriften
-text(1, mean_pre,  labels = round(mean_pre,2),  col = "red", pos = 3)
-text(2, mean_post, labels = round(mean_post,2), col = "red", pos = 3)
-
