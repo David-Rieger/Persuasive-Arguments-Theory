@@ -4,7 +4,7 @@
 
 This is a FAIR implementation of Burnstein and Vinokur's "Persuasive Arguments Theory"
 theory, a theory of group polarization through group discussions.
-See https://docs.google.com/document/d/1ZWsHYC1vxffO_8S6M7soKv-wu5rG7UvxhIzmVQ_EPBo/edit?usp=sharing 
+See [the Google Doc] (https://docs.google.com/document/d/1ZWsHYC1vxffO_8S6M7soKv-wu5rG7UvxhIzmVQ_EPBo/edit?usp=sharing) 
 for Construct Source Tables etc.
 
 ## Interoperability
