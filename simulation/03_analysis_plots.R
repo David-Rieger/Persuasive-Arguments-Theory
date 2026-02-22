@@ -65,41 +65,42 @@ p2 <- ggplot(sim_data) +
 
 ggsave("plots/02_dampening_effect.png", plot = p2, width = 7, height = 6, dpi = 300)
 
-# --- Demo 3: Evolution (discuss_and_update) ---
+# --- Demo 3: Theoretical System Behavior ---
 
 # 1. Simulate Data (Demo)
 set.seed(101)
-pool_vector <- create_pool(pool_size = 5000, pool_bias = 0.6)
-agent <- initialize_agent(agent_id = 1, pool = pool_vector, n_IA = 4, C = 4)
-steps <- 15
+pool_vector_sys <- create_pool(pool_size = 5000, pool_bias = 0.6)
+
+# Initialize agent with 0 arguments to visualize the complete mathematical curve
+agent_sys <- initialize_agent(agent_id = 1, pool = pool_vector_sys, n_IA = 0, C = 5) 
+
+steps <- 30
 history <- data.frame(Step = 0:steps, N_Arguments = NA, Tendency = NA)
-history$N_Arguments[1] <- length(agent$arguments)
-history$Tendency[1] <- agent$t_pre
+history$N_Arguments[1] <- 0
+history$Tendency[1] <- 0 
 
 for (i in 1:steps) {
-  agent <- discuss_and_update(agent, pool_vector, n_AA = 1, C = 4)
-  history$N_Arguments[i + 1] <- length(agent$arguments)
-  history$Tendency[i + 1] <- agent$t_post
+  agent_sys <- discuss_and_update(agent_sys, pool_vector_sys, n_AA = 1, C = 5)
+  history$N_Arguments[i + 1] <- length(agent_sys$arguments)
+  history$Tendency[i + 1] <- agent_sys$t_post
 }
 
 # 2. Visualization
 p3 <- ggplot(history, aes(x = N_Arguments, y = Tendency)) +
-  theme_classic(base_size = 12) +
-  geom_hline(yintercept = 0.6, color = "darkgreen", linetype = "dashed") +
-  annotate("text", x = 5, y = 0.65, label = "True Pool Bias (0.6)", color = "darkgreen") +
-  geom_line(color = "firebrick", size = 1) +
-  geom_point(size = 3, color = "firebrick") +
-  annotate("text", x = history$N_Arguments[1], y = history$Tendency[1] - 0.08, label = "Pre") +
-  annotate("text", x = max(history$N_Arguments), y = tail(history$Tendency, 1) - 0.08, label = "Post") +
-  scale_y_continuous(limits = c(-1, 1)) +
+  theme_classic(base_size = 14) +
+  geom_hline(yintercept = 0.6, color = "darkgreen", linetype = "dashed", linewidth = 1) +
+  annotate("text", x = 8, y = 0.65, label = "Structural Bias Asymptote (0.6)", color = "darkgreen", fontface = "bold") +
+  geom_line(color = "firebrick", linewidth = 1.2) +
+  geom_point(size = 3, color = "black") +
+  scale_y_continuous(limits = c(-0.1, 1), breaks = seq(0, 1, 0.2)) +
   labs(
-    title = "Evolution of Opinion Tendency During Discussion",
-    subtitle = expression(paste("Convergence of agent opinion towards pool bias as argument count ", italic(N), " increases (", italic(C) == 4, ")")),
-    x = expression(paste("Total Number of Arguments Held (", italic(N), ")")),
-    y = expression(paste("Opinion Tendency (", italic(T), ")"))
+    title = "Theoretical Behavior of the Complete System",
+    subtitle = expression(paste("Transformation of tendency as new arguments are integrated (", italic(C) == 5, ")")),
+    x = expression(paste("Total Number of Arguments Held (", n[i]^{IA} + n[i]^{AA}, ")")),
+    y = expression(Resulting~Tendency~"("~italic(T)[i]~")")
   )
 
-ggsave("plots/03_opinion_trajectory.png", plot = p3, width = 8, height = 5, dpi = 300)
+ggsave("plots/03_system_behavior.png", plot = p3, width = 8, height = 5, dpi = 300)
 
 # ------------------------------------------------------------------------------
 # PART 2: Main Experiment Visualization (Group Polarization)
