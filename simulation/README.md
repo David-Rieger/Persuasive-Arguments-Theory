@@ -4,6 +4,7 @@ This main folder contains all the files for the simulation. They R-scripts are t
 in the following order: 
 1) functions
 2) simulations
-3) analysis
+3) analysis_plots
+4) analysis_statistics
 
-The jpgs-files of the simulation can be found in the subfolder 'plots'.
+The jpgs-files of the analysis plots can be found in the subfolder 'plots'.
