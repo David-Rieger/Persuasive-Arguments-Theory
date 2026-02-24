@@ -1,8 +1,8 @@
 # ------------------------------------------------------------------------------
-# PART 2: Statistical Analysis (Hypothesis Testing)
+# Statistical Analysis (Hypothesis Testing)
 # ------------------------------------------------------------------------------
 
-source("functions.R")
+source("01_functions.R")
 load("simulation_data.RData")
 
 # Test 1: Original Study Baseline (C=0)

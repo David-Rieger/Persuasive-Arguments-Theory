@@ -2,7 +2,7 @@
 # Persuasive Arguments Theory (PAT) Simulation Module - ANALYSIS & PLOTS
 # ==============================================================================
 
-source("functions.R")      # Load plotting themes/libs implicitly
+source("01_functions.R")      # Load plotting themes/libs implicitly
 load("simulation_data.RData") # Load the results from simulation.R
 library(ggplot2)
 library(dplyr)
@@ -118,7 +118,7 @@ plot_data <- simulation_C %>%
   mutate(Phase = factor(Phase, levels = c("T_pre", "T_post")))
 
 # Sample random individuals for trajectory lines
-set.seed(123)
+set.seed(111)
 sampled_ids <- sample(unique(plot_data$UniqueID), 10)
 sampled_data <- plot_data %>% filter(UniqueID %in% sampled_ids)
 

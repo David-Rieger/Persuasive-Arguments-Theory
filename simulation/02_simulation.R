@@ -2,7 +2,7 @@
 # Persuasive Arguments Theory (PAT) Simulation Module - SIMULATION RUNS
 # ==============================================================================
 
-source("functions.R")
+source("01_functions.R")
 
 # 1. Simulation: Original Study Baseline
 # ------------------------------------------------------------------------------
