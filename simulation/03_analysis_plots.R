@@ -144,7 +144,7 @@ p4 <- ggplot(plot_data, aes(x = Phase, y = Value)) +
   # Means
   stat_summary(fun = mean, geom = "point", shape = 23, size = 3.5, fill = "firebrick", color = "black", stroke = 1) +
   stat_summary(fun = mean, geom = "text", aes(label = sprintf("%.2f", after_stat(y))), 
-               vjust = -2.5, color = "firebrick", fontface = "bold", size = 3.5) +
+               vjust = -4.0, color = "firebrick", fontface = "bold", size = 3.5) +
   
   scale_y_continuous(limits = c(-1, 1), breaks = seq(-1, 1, 0.25)) +
   scale_x_discrete(labels = c("Pre-Discussion", "Post-Discussion")) +

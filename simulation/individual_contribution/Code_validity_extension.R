@@ -6,6 +6,11 @@
 library(ggplot2)
 library(tidyr)
 library(dplyr)
+library(effectsize)
+
+# ==============================================================================
+# 1. FUNCTIONS
+# ==============================================================================
 
 #' Create Binary Argument Pool
 #'
@@ -231,10 +236,9 @@ simulate_experiment <- function(n_groups = 10, n_agents_per_group = 4, ...) {
 }
 
 # ==============================================================================
-# EXECUTION & EVALUATION
+# 2. SIMULATION
 # ==============================================================================
 
-# 1. Run Subjective Validity Simulation
 set.seed(1)
 simulation_validity <- simulate_experiment(
   n_groups = 50, 
@@ -246,12 +250,11 @@ simulation_validity <- simulate_experiment(
   conf_bias_strength = 1.0
 )
 
-# 2. Paired t-Test
-print("--- Result: Subjective Validity Model ---")
-validity_ttest <- t.test(simulation_validity$T_post, simulation_validity$T_pre, paired = TRUE)
-print(validity_ttest)
+# ==============================================================================
+# 3. ANALYSIS_PLOTS
+# ==============================================================================
 
-# 3. Data Preparation for Plotting
+# Data Preparation for Plotting
 plot_data_validity <- simulation_validity %>%
   mutate(UniqueID = paste0("G", GroupID, "_A", AgentID)) %>%
   select(UniqueID, T_pre, T_post) %>%
@@ -267,7 +270,7 @@ set.seed(123)
 sampled_ids_val <- sample(unique(plot_data_validity$UniqueID), 10)
 sampled_data_val <- plot_data_validity %>% filter(UniqueID %in% sampled_ids_val)
 
-# 4. Boxplot Output
+# Boxplot Output
 p_validity <- ggplot(plot_data_validity, aes(x = Phase, y = Value)) +
   theme_bw(base_size = 14) +
   theme(
@@ -289,7 +292,7 @@ p_validity <- ggplot(plot_data_validity, aes(x = Phase, y = Value)) +
   # Means
   stat_summary(fun = mean, geom = "point", shape = 23, size = 3.5, fill = "firebrick", color = "black", stroke = 1) +
   stat_summary(fun = mean, geom = "text", aes(label = sprintf("%.2f", after_stat(y))), 
-               vjust = -2.5, color = "firebrick", fontface = "bold", size = 3.5) +
+               vjust = 2.5, color = "firebrick", fontface = "bold", size = 3.5) +
   
   scale_y_continuous(limits = c(-1, 1), breaks = seq(-1, 1, 0.25)) +
   scale_x_discrete(labels = c("Pre-Discussion", "Post-Discussion")) +
@@ -302,3 +305,14 @@ p_validity <- ggplot(plot_data_validity, aes(x = Phase, y = Value)) +
   )
 
 ggsave("individual_contribution/validity_group_polarization_result.png", plot = p_validity, width = 8, height = 6, dpi = 300)
+
+# ==============================================================================
+# 4. ANALYSIS_STATISTICS
+# ==============================================================================
+
+print("--- Result: Subjective Validity Model ---")
+validity_ttest <- t.test(simulation_validity$T_post, simulation_validity$T_pre, paired = TRUE)
+print(validity_ttest)
+
+validity_d <- cohens_d(simulation_validity$T_post, simulation_validity$T_pre, paired = TRUE)
+print(validity_d)
