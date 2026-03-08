@@ -1,10 +1,11 @@
-# Instructions for the use of the files
+# Individual Contribution
 
-This main folder contains all the files for the simulation. They R-scripts are to be used
-in the following order: 
+This directory contains the components for an alternative model of Persuasive Arguments Theory (PAT).
+
+The main script integrates the entire execution pipeline. The code is structured into:
 1) functions
 2) simulations
 3) analysis_plots
 4) analysis_statistics
 
-The jpgs-files of the analysis plots can be found in the subfolder 'plots'.
+The resulting analytical plot is located in this directory.
