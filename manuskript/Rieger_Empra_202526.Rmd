@@ -1,0 +1,852 @@
+---
+title: "Mathematical Formalization of Persuasive Arguments Theory: Explaining Group Polarization and Choice Shifts"
+shorttitle: "Formalizing Persuasive Arguments Theory"
+author:
+  - name: "David Rieger"
+    affiliation: "1"
+affiliation:
+  - id: "1"
+    institution: "Ludwig-Maximilians-University Munich"
+floatsintext: yes
+header-includes:
+  - \raggedbottom
+authornote: |
+  Student ID: 12558391
+  
+  Course: P 19: Empirisch-psychologisches Praktikum
+  
+  Date: 08.03.2026
+abstract: |
+  Group polarization occurs when an initial tendency of individual group members toward a given direction is enhanced following group discussion. Persuasive Arguments Theory (PAT) explains this attitude shift through information processing, positing that an individual's position on an issue is determined by the number and persuasiveness of arguments they recall and exchange. This study translates the verbal formulations of PAT into an explicit conceptual model using the Visual Argument Structure Tool (VAST). Initial simulations revealed that a simplified computational translation failed to produce group polarization, necessitating an auxiliary assumption formalized as a dampening model incorporating an uncertainty factor. To determine whether the original theoretical framework could generate the phenomenon with less simplification, a subjective validity model was developed, utilizing dynamic confirmation bias to determine argument persuasiveness. Simulations of 50 groups, each consisting of 10 individuals, were conducted for each model respectively, demonstrating that both computational variants successfully generate the phenomenon of group polarization. Ultimately, this process shows that mathematical modeling is essential for uncovering the precise functional conditions under which a verbal theory successfully produces its predicted effects.
+keywords:
+  - Persuasive Arguments Theory
+  - Group Polarization
+  - Choice Shift
+  - Computational Formalization
+  - Visual Argument Structure Tool
+output:
+  papaja::apa6_pdf:
+    keep_tex: true
+bibliography: zotero.bib
+csl: apa7.csl
+lang: en-US
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(papaja)
+```
+
+```{r analysis-preferences}
+# Seed for random number generation
+set.seed(42)
+knitr::opts_chunk$set(cache.extra = knitr::rand_seed)
+```
+
+```{r setup-functions, include=FALSE}
+# Libraries
+
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+# ==============================================================================
+# 1. DAMPENING MODEL FUNCTIONS (C-Factor)
+# ==============================================================================
+
+create_pool <- function(pool_size, pool_bias) {
+  mu <- (pool_bias + 1) / 2
+  nu <- 10 
+  shape1 <- mu * nu
+  shape2 <- (1 - mu) * nu
+  val_01 <- rbeta(pool_size, shape1, shape2)
+  return(val_01 * 2 - 1)
+}
+
+calc_tendency <- function(arguments, C = 0) {
+  n <- length(arguments)
+  return(sum(arguments) / (n + C))
+}
+
+initialize_agent <- function(agent_id, pool, n_IA, C) {
+  ia_i <- sample(pool, size = n_IA, replace = FALSE)
+  t_pre <- calc_tendency(ia_i, C)
+  list(id = agent_id, arguments = ia_i, t_pre = t_pre, t_post = NA_real_, shift = NA_real_)
+}
+
+discuss_and_update <- function(agent, pool, n_AA, C) {
+  aa_i <- sample(pool, size = n_AA, replace = TRUE)
+  new_arguments <- c(agent$arguments, aa_i)
+  t_post <- calc_tendency(new_arguments, C)
+  agent$arguments <- new_arguments
+  agent$t_post <- t_post
+  agent$shift <- t_post - agent$t_pre
+  return(agent)
+}
+
+calculate_group_polarization <- function(agents_list) {
+  all_pre <- sapply(agents_list, function(x) x$t_pre)
+  all_post <- sapply(agents_list, function(x) x$t_post)
+  
+  mean_pre <- mean(all_pre)
+  mean_post <- mean(all_post)
+  
+  return(mean_post - mean_pre)
+}
+
+run_simulation <- function(n_agents = 10,
+                           pool_size = 1000,
+                           pool_bias = 0.6,
+                           n_IA = 3,
+                           n_AA = 20,
+                           C = 0) {
+  group_pool <- create_pool(pool_size, pool_bias)
+  agents <- vector("list", n_agents)
+  for(i in 1:n_agents) {
+    agents[[i]] <- initialize_agent(i, group_pool, n_IA, C)
+  }
+  for(i in 1:n_agents) {
+    agents[[i]] <- discuss_and_update(agents[[i]], group_pool, n_AA, C)
+  }
+  gp <- calculate_group_polarization(agents)
+  results_df <- data.frame(
+    AgentID = sapply(agents, function(x) x$id),
+    T_pre = round(sapply(agents, function(x) x$t_pre), 3),
+    T_post = round(sapply(agents, function(x) x$t_post), 3),
+    Shift = round(sapply(agents, function(x) x$shift), 3)
+  )
+  list(
+    Config = list(
+      N_Agents = n_agents,
+      Pool_Bias = pool_bias,
+      C_Factor = C,
+      N_Initial_Args = n_IA,
+      N_Additional_Args = n_AA
+    ),
+    Individual_Data = results_df,
+    Group_Polarization = gp
+  )
+}
+
+simulate_experiment <- function(n_groups = 10, n_agents_per_group = 4, ...) {
+  all_data_list <- list()
+  args_list <- list(...)
+  args_list$n_agents <- n_agents_per_group
+  for (g in 1:n_groups) {
+    sim_result <- do.call(run_simulation, args_list)
+    df <- sim_result$Individual_Data
+    df$GroupID <- g
+    all_data_list[[g]] <- df
+  }
+  full_dataset <- do.call(rbind, all_data_list)
+  return(full_dataset)
+}
+
+# ==============================================================================
+# 2. VALIDITY MODEL FUNCTIONS (Dynamic Confirmation Bias)
+# ==============================================================================
+
+create_pool_val <- function(pool_size, pool_bias) {
+  prob_pos <- (pool_bias + 1) / 2
+  arguments <- sample(c(-1, 1), size = pool_size, replace = TRUE, 
+                      prob = c(1 - prob_pos, prob_pos))
+  return(arguments)
+}
+
+initialize_agent_val <- function(agent_id, pool, n_IA) {
+  ia_values <- sample(pool, size = n_IA, replace = FALSE)
+  ia_weights <- rep(1, n_IA) 
+  sum_val <- sum(ia_values * ia_weights)
+  sum_w   <- sum(ia_weights)
+  t_pre <- if(sum_w == 0) 0 else sum_val / sum_w
+  list(
+    id = agent_id,
+    sum_val = sum_val, 
+    sum_w   = sum_w,   
+    t_pre   = t_pre,
+    t_post  = NA_real_,
+    shift   = NA_real_
+  )
+}
+
+discuss_and_update_val <- function(agent, pool, n_AA, conf_bias_strength = 1) {
+  current_sum_val <- agent$sum_val
+  current_sum_w   <- agent$sum_w
+  current_t       <- agent$t_pre
+  for(k in 1:n_AA) {
+    new_arg <- sample(pool, size = 1, replace = TRUE)
+    is_consonant <- (new_arg * current_t) >= 0 
+    if (is_consonant) {
+      weight <- 1.0
+    } else {
+      weight <- 1.0 - (abs(current_t) * conf_bias_strength)
+      if(weight < 0) weight <- 0
+    }
+    current_sum_val <- current_sum_val + (new_arg * weight)
+    current_sum_w   <- current_sum_w + weight
+    current_t <- current_sum_val / current_sum_w
+  }
+  agent$t_post  <- current_t
+  agent$shift   <- agent$t_post - agent$t_pre
+  agent$sum_val <- current_sum_val
+  agent$sum_w   <- current_sum_w
+  return(agent)
+}
+
+run_simulation_val <- function(n_agents = 10, 
+                               pool_size = 1000, 
+                               pool_bias = 0.5, 
+                               n_IA = 3, 
+                               n_AA = 20, 
+                               conf_bias_strength = 1.0) {
+  group_pool <- create_pool_val(pool_size, pool_bias)
+  agents <- vector("list", n_agents)
+  for(i in 1:n_agents) {
+    agents[[i]] <- initialize_agent_val(i, group_pool, n_IA)
+  }
+  for(i in 1:n_agents) {
+    agents[[i]] <- discuss_and_update_val(agents[[i]], group_pool, n_AA, conf_bias_strength)
+  }
+  all_pre <- sapply(agents, function(x) x$t_pre)
+  all_post <- sapply(agents, function(x) x$t_post)
+  gp <- mean(all_post) - mean(all_pre)
+  results_df <- data.frame(
+    AgentID = sapply(agents, function(x) x$id),
+    T_pre = round(all_pre, 3),
+    T_post = round(all_post, 3),
+    Shift = round(all_post - all_pre, 3)
+  )
+  list(
+    Config = list(
+      n_agents = n_agents, 
+      pool_bias = pool_bias, 
+      conf_bias = conf_bias_strength,
+      n_IA = n_IA,
+      n_AA = n_AA
+    ),
+    Individual_Data = results_df,
+    Group_Polarization = gp
+  )
+}
+
+simulate_experiment_val <- function(n_groups = 10, n_agents_per_group = 4, ...) {
+  all_data_list <- list()
+  args_list <- list(...)
+  args_list$n_agents <- n_agents_per_group
+  for (g in 1:n_groups) {
+    sim_result <- do.call(run_simulation_val, args_list)
+    df <- sim_result$Individual_Data
+    df$GroupID <- g
+    all_data_list[[g]] <- df
+  }
+  full_dataset <- do.call(rbind, all_data_list)
+  return(full_dataset)
+}
+```
+
+# Introduction
+
+## Objective of the Formalization
+
+The primary objective of the following work is to translate the verbal formulations of Persuasive Arguments Theory (PAT) into a formalized, mathematical, and computational model to explicitly explain the phenomenon of group polarization This formalization adheres to the theoretical specification framework proposed by @vanlissaBeFAIRTheory2026, ensuring that the resulting model aligns with FAIR principles — making our implementation of the theory Findable, Accessible, Interoperable, and Reusable.
+
+## Introduction to Persuasive Arguments Theory
+
+Persuasive Arguments Theory (PAT), formulated by @burnsteinPersuasiveArgumentationSocial1977, is a cognitive model explaining attitude shifts through information processing. PAT posits that an individual's position on an issue is determined by the number and persuasiveness of arguments recalled from memory and exchanged during discussion [@isenbergGroupPolarizationCritical1986]. A meta-analysis by @isenbergGroupPolarizationCritical1986 demonstrates that PAT provides a significantly more robust empirical explanation for the magnitude and direction of group polarization than competing social comparison theories. Explicit computational formalizations targeting the specific phenomenon of group polarization currently remain absent, as recent agent-based models primarily focus on boundary conditions for bipolarization [@pedrazaAnalyticalInsightsModel2025].
+
+## Phenomenological Target: Group Polarization
+
+The phenomenological target of this formalization is group polarization. Group polarization is defined as the occurrence where an initial tendency of individual group members toward a given direction is enhanced following group discussion [@isenbergGroupPolarizationCritical1986]. The core mechanism dictates that on decisions where group members hold a moderate average proclivity in a specific direction, subsequent group discussion results in a more extreme average proclivity in that identical direction.
+
+A prototypical primary study demonstrating this effect was conducted by @moscoviciGroupPolarizerAttitudes1969. In their experimental design, participants initially recorded their private opinions and judgments on various issues. They subsequently discussed these issues in groups of four to reach a consensus, which was followed by a final private recording of their opinions. The results consistently demonstrated that initial attitudes were significantly intensified post-discussion.
+
+The robustness of this phenomenon is extensively documented. @isenbergGroupPolarizationCritical1986 provides strong meta-analytic evidence, revealing a substantial average effect size of $r = .746$ for group polarization driven by persuasive argumentation. Assessing generalizability through the Units, Treatments, Outcomes, and Settings (UTOS) framework [@cronbachDesigningEvaluationsEducational1982], the phenomenon demonstrates broad applicability across diverse demographic units (e.g., students, simulated juries), experimental treatments (e.g., differing discussion formats), outcomes (e.g., choice dilemmas, mock-trial judgments), and settings present in the meta-analytic literature. Therefore, the phenomenon can be considered robust due to strong, consistently generalizing empirical evidence.
+
+# Methods
+
+All computational code, simulation data, and supplementary materials required to reproduce this formalization are openly accessible in the project repository at https://github.com/David-Rieger/Persuasive-Arguments-Theory.
+
+## Statistical Software and Transparency
+
+All computational simulations and statistical analyses were conducted in R version 4.5.0 [@rcoreteamLanguageEnvironmentStatistical2025]. Data processing and visualizations were implemented using the `tidyverse` suite, while effect sizes were calculated using the `effectsize` package. To ensure reproducibility and adherence to APA 7 formatting standards, the manuscript was prepared using the `papaja` R-package version 0.1.3 [@austPapajaPrepareReproducible2024].
+
+## Core Constructs and Theoretical Mechanisms
+
+To formalize PAT, we systematically map its verbal formulations into a Visual Argument Structure Tool (VAST) display [@leisingVisualArgumentStructure2023]. Figures 1, 2, and 3 categorize the theory across phenomenological, theoretical, and argument levels. A complete mapping of concepts, original quotes, and IDs is provided in the Construct Source Table (Appendix A).
+
+The first panel (Figure 1) focuses on the phenomenological level, illustrating the transition from individual states to the aggregate phenomenon. Here, an individual with a moderate initial tendency ($T_i^{pre}$; ID 2) participates in group discussion (GD; ID 3), triggering psychological processing (represented by the $\Psi$-box) that results in a more extreme post-discussion tendency ($T_i^{post}$; ID 4). In this initial display, the entire process is labeled Group Polarization (GP; ID 1), directly reflecting the standard verbal descriptions found in the literature.
+
+\newpage
+
+\begin{flushleft}
+\textbf{Figure 1} \\
+\textit{VAST Display Illustrating the Phenomenon of Group Polarization and Individual Choice Shift}
+\end{flushleft}
+
+```{r, echo=FALSE, fig.align="center", fig.pos="H", out.width="100%", fig.cap=NULL}
+knitr::include_graphics("VAST_Phenomenon.png")
+```
+
+\begin{flushleft}
+\textit{Note.} Mapping of the transition from individual choice shifts to aggregate group polarization.
+\end{flushleft}
+
+\vspace{2em}
+
+The second panel (Figure 2) advances to the theoretical level by integrating the causal mechanisms of PAT. The transition from $T_i^{pre}$ to $T_i^{post}$ is shown to be driven by the cognitive integration (ID 8, ID 12) of the initial argument set ($IA_i$; ID 5) and additional arguments ($AA_i$; ID 9). At this stage, the model is refined for structural and logical completeness: the individual-level process is more precisely relabeled as Choice Shift (CS; ID 11), while Group Polarization (GP; ID 1) is redefined as the macro-level aggregate. To quantify these group states, macro-variables $\overline{T}^{pre}$ (ID 17) and $\overline{T}^{post}$ (ID 18) are introduced, allowing the individual shifts to be logically aggregated into a collective outcome. Crucially, the $\Psi$-box remains a "closed" black box to avoid visual redundancy, as all measurable variables are already explicitly modeled as external inputs and outputs.
+
+The third panel (Figure 3) specifies the argument level, quantifying the cognitive foundation of these shifts. It accounts for the volume of information through the number of initial ($n_i^{IA}$; ID 6) and additional arguments ($n_i^{AA}$; ID 10). According to PAT, an argument’s persuasiveness ($p_j$; ID 13) is a direct function (ID 16) of its perceived validity ($val_j$; ID 14) and novelty ($nov_j$; ID 15). By mathematically summing the persuasiveness and directional valence ($d_j$; ID 7) of all arguments within the sets ($IA_i$ and $AA_i$), the individual’s cognitive architecture generates the choice shift that ultimately drives group-level polarization.
+
+\vspace{2em}
+
+\begin{flushleft}
+\textbf{Figure 2} \\
+\textit{VAST Display Illustrating the Theoretical Level of Persuasive Arguments Theory}
+\end{flushleft}
+
+```{r, echo=FALSE, fig.align="center", fig.pos="H", out.width="100%", fig.cap=NULL}
+knitr::include_graphics("VAST_Theory_1.png")
+```
+
+\begin{flushleft}
+\textit{Note.} Conceptual framework for the cognitive integration of initial and additional argument sets.
+\end{flushleft}
+
+\newpage
+
+\begin{flushleft}
+\textbf{Figure 3} \\
+\textit{VAST Display Illustrating the Argument Level and Determinants of Persuasiveness}
+\end{flushleft}
+
+```{r, echo=FALSE, fig.align="center", fig.pos="H", out.width="100%", fig.cap=NULL}
+knitr::include_graphics("VAST_Theory_2.png")
+```
+
+\begin{flushleft}
+\textit{Note.} Structural breakdown of variables determining argument persuasiveness.
+\end{flushleft}
+
+## Mathematical Formalization and Model Architecture
+
+The computational translation relies on variables detailed in the Variable Table (Appendix A). Tendencies ($T$) are formalized continuously from -1 (extreme contra) to +1 (extreme pro). Argument counts ($n$) are discrete integers, while directional valence ($d_j$) is dichotomous (-1, +1). Persuasiveness ($p_j$) is defined continuously [0, 1]. To streamline the architecture, perceived novelty and validity were aggregated into this singular persuasiveness factor.
+
+### Baseline Mathematical Relationships
+
+The core causal mechanisms of the model are formalized through the following baseline mathematical relationships.
+
+The individual's initial argument set ($IA_i$) and additional argument set ($AA_i$) are defined as arrays of arguments, where each argument consists of a direction and persuasiveness score (ID 8, ID 9):
+$$IA_i = (a_1, a_2, \dots, a_n) \text{ with } a_j = (d_j, p_j)$$
+$$AA_i = (a_{n+1}, a_{n+2}, \dots, a_{n+m}) \text{ with } a_k = (d_k, p_k)$$
+
+The individual's initial tendency is calculated as the weighted average of their initial argument set (ID 2):
+$$T_i^{pre} = \frac{1}{n} \sum_{j \in IA_i} p_j d_j$$
+
+The individual's post-discussion tendency integrates both the initial and additional argument sets (ID 4):
+$$T_i^{post} = \frac{1}{n_i^{IA} + n_i^{AA}} \left( \sum_{j \in IA_i} p_j d_j + \sum_{j \in AA_i} p_j d_j \right)$$
+
+The initial aggregate group tendency is the arithmetic mean of all individual initial tendencies (ID 17):
+$$\overline{T}^{pre} = \frac{1}{N} \sum_{i=1}^N T_i^{pre}$$
+
+The aggregate group tendency post-discussion represents the sum of the initial group tendency and the average impact of the newly exchanged arguments (ID 18):
+$$\overline{T}^{post} = \overline{T}^{pre} + \frac{1}{N} \sum_{i=1}^N \sum_{j \in AA_i} p_j d_j$$
+
+### Implementation Deviations
+
+To ensure mathematical stability and behavioral realism, two structural deviations were implemented:
+
+\vspace{2em}
+
+\begin{flushleft}
+\textbf{Figure 4} \\
+\textit{Distribution of Argument Valence in the Generated Pool}
+\end{flushleft}
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align="center", fig.pos="H", out.width="100%", fig.cap=NULL}
+set.seed(42)
+pool_data <- create_pool(pool_size = 10000, pool_bias = 0.4)
+
+ggplot(data.frame(Value = pool_data), aes(x = Value)) +
+  theme_bw(base_size = 14) +
+  geom_histogram(binwidth = 0.05, fill = "steelblue", color = "white", alpha = 0.8) +
+  geom_vline(xintercept = 0.4, color = "firebrick", linewidth = 1.2, linetype = "dashed") +
+  scale_x_continuous(limits = c(-1, 1), breaks = seq(-1, 1, 0.5)) +
+  labs(
+    x = expression(paste("Argument Valence (", italic(v), ") [-1: Contra, +1: Pro]")),
+    y = "Frequency"
+  )
+```
+
+\begin{flushleft}
+\textit{Note.} Histogram showing the scaled Beta-distribution centered around the bias parameter.
+\end{flushleft}
+
+\vspace{2em}
+
+**Deviation 1: Generative Approach to Argument Pools.**
+Instead of static input vectors, the model dynamically samples arguments from a simulated pool defined by size and a structural bias parameter ($\mu$). Both initial ($IA_i$) and additional ($AA_i$) arguments are drawn from this identical pool. This stochastic sampling mechanism introduces structural randomness and reflects the tendency of groups to share information aligned with a specific predisposition (see Figure 4).
+
+**Deviation 2: Calculation Logic and Uncertainty-Dependent Stability.**
+Our baseline mathematical translation of the theory fails to endogenously produce the target phenomenon. Because both initial and additional arguments are drawn from the same biased pool, the statistical integration of $AA_i$ merely reduces the variance of opinions across the group (regression toward the pool mean). To systematically force the phenomenon, a dampening factor ($C$) was added to the denominator:
+
+$$T_i = \frac{1}{n + C} \sum_{j=1}^{n} p_j d_j$$
+
+Psychologically, $C$ operationalizes uncertainty-dependent stability: initial opinions based on low argument counts are heavily damped toward zero (see Figure 5). As arguments accumulate during discussion, the dampening diminishes, allowing opinions to extremize. While mathematically necessary, the psychological realism and theoretical validity of this dampening assumption remain open to debate.
+
+\newpage
+
+\begin{flushleft}
+\textbf{Figure 5} \\
+\textit{Impact of Uncertainty on Initial Opinion Formation}
+\end{flushleft}
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align="center", fig.pos="H", out.width="100%", fig.cap=NULL}
+set.seed(42)
+pool_vector <- create_pool(pool_size = 1000, pool_bias = 0.5)
+n_agents <- 30
+sim_data <- data.frame(id = 1:n_agents, Pure_Mean = NA, Damped_Tendency = NA)
+
+for (i in 1:n_agents) {
+  agent <- initialize_agent(i, pool_vector, n_IA = 3, C = 4)
+  sim_data$Damped_Tendency[i] <- agent$t_pre
+  sim_data$Pure_Mean[i] <- mean(agent$arguments)
+}
+
+ggplot(sim_data) +
+  theme_classic(base_size = 12) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey60") +
+  geom_segment(aes(x = Pure_Mean, xend = Pure_Mean, y = Pure_Mean, yend = Damped_Tendency),
+                arrow = arrow(length = unit(0.2, "cm")), color = "grey70") +
+  # 'size' bleibt hier für Punkte korrekt
+  geom_point(aes(x = Pure_Mean, y = Damped_Tendency), size = 3, color = "steelblue") +
+  scale_x_continuous(limits = c(-1, 1)) +
+  scale_y_continuous(limits = c(-1, 1)) +
+  labs(
+    x = "Arithmetic Mean of Arguments (Raw Opinion)",
+    y = expression(paste("Calculated Tendency (", italic(T)[pre], ")"))
+  )
+```
+
+\begin{flushleft}
+\textit{Note.} Comparison of raw arithmetic mean versus damped tendency with uncertainty factor C.
+\end{flushleft}
+
+\vspace{2em}
+
+### System Behavior and Phenomenon Emergence
+
+To verify the model’s mathematical logic, we first analyze its "transfer function" at the individual level. This analysis evaluates how the parameters—specifically pool bias ($\mu$) and dampening ($C$)—interact to drive the evolution of a single agent's opinion before testing for aggregate group effects.
+
+\newpage
+
+\begin{flushleft}
+\textbf{Figure 6} \\
+\textit{Theoretical Behavior of the Complete Formal Model}
+\end{flushleft}
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align="center", fig.pos="H", out.width="100%", fig.cap=NULL}
+set.seed(101)
+pool_vector_sys <- create_pool(pool_size = 5000, pool_bias = 0.6)
+agent_sys <- initialize_agent(agent_id = 1, pool = pool_vector_sys, n_IA = 0, C = 5) 
+
+steps <- 30
+history <- data.frame(Step = 0:steps, N_Arguments = NA, Tendency = NA)
+history$N_Arguments[1] <- 0
+history$Tendency[1] <- 0 
+
+for (i in 1:steps) {
+  agent_sys <- discuss_and_update(agent_sys, pool_vector_sys, n_AA = 1, C = 5)
+  history$N_Arguments[i + 1] <- length(agent_sys$arguments)
+  history$Tendency[i + 1] <- agent_sys$t_post
+}
+
+ggplot(history, aes(x = N_Arguments, y = Tendency)) +
+  theme_classic(base_size = 14) +
+  geom_hline(yintercept = 0.6, color = "darkgreen", linetype = "dashed", linewidth = 1) +
+  annotate("text", x = 8, y = 0.65, label = "Structural Bias Asymptote (0.6)", color = "darkgreen", fontface = "bold") +
+  # 'linewidth' ist hier bereits korrekt gesetzt
+  geom_line(color = "firebrick", linewidth = 1.2) +
+  geom_point(size = 3, color = "black") +
+  scale_y_continuous(limits = c(-0.1, 1), breaks = seq(0, 1, 0.2)) +
+  labs(
+    x = expression(paste("Total Number of Arguments Held (", n[i]^{IA} + n[i]^{AA}, ")")),
+    y = expression(Resulting~Tendency~"("~italic(T)[i]~")")
+  )
+```
+
+\begin{flushleft}
+\textit{Note.} Update trajectory of an individual's tendency as it approaches the pool bias asymptote.
+\end{flushleft}
+
+\vspace{2em}
+
+Figure 6 visualizes this process by mapping an agent’s trajectory. Because all arguments are sampled from the same generative pool, the distinction between initial arguments ($n_i^{IA}$) and additional arguments ($n_i^{AA}$) is secondary here; the focus lies on the continuous integration of information. The plot demonstrates how sustained exposure to the structural pool bias systematically overrides the initial uncertainty dampening, driving the individual tendency ($T_i$) asymptotically toward the bias.
+
+This confirms that the micro-level architecture successfully generates a directional choice shift. However, as this isolated mechanism does not yet represent group polarization, the subsequent evaluation phase will simulate multiple agents to verify if these individual shifts compound into the predicted macro-level phenomenon.
+
+### Individual Contribution: Subjective Validity as a Determinant of Persuasiveness
+
+The initial formalization of the model simplified the mathematical architecture of Persuasive Arguments Theory by treating argument persuasiveness as a static constant. This reduction necessitated the inclusion of the dampening factor $C$ within the formal model to theoretically account for the generation of a directional choice shift at the individual level. By reincorporating subjective validity as a dynamic determinant of persuasiveness, the following model provides an alternative approach to how information is processed and integrated. In this framework, the argument pool is defined by binary directional values of 1 and -1. The persuasiveness of each argument is no longer a fixed attribute but is instead determined during the processing phase based on its alignment with the current individual tendency $T$.
+
+The model utilizes a parameter for confirmation bias strength denoted as $\beta$, which formalizes the psychological tendency to favor information that confirms existing beliefs while discounting contradictory evidence. During the sequential integration of arguments in the "group discussion", those that align with the direction of the current tendency are assigned a full weight of 1.0. Dissonant arguments are processed using a weight reduction formula where $w = 1 - (|T| \cdot \beta)$ and $w$ is restricted to a minimum of zero. This ensures that the weight assigned to opposing arguments decreases as the individual tendency becomes more extreme. This operationalization allows for the evaluation of how the perceived validity of information varies according to the internal state of the agent. The complete computational implementation of this framework is provided in the project repository.
+
+# Results
+
+The simulation utilized the `simulate_experiment` configuration to initialize 50 independent groups, each containing 10 agents. The argument pool bias was set to 0.4. Agents were assigned 4 initial arguments ($n^{IA}$) and integrated 12 additional arguments ($n^{AA}$) during the discussion phase. Due to the large sample size, a conservative alpha level of 0.005 was adopted for all statistical evaluations. The evaluation tests two structural variants: the dampening model utilizing an uncertainty factor ($C = 4$), and the subjective validity model driven by dynamic confirmation bias strength ($\beta = 1.0$).
+
+A paired-samples t-test confirms a significant positive choice shift in the dampening model, demonstrating the emergence of group polarization ($M_{pre}$ = 0.20, $M_{post}$ = 0.32; $t(499) = 41.34$, $p < 2.2e-16$, $d = 1.85$, $95\% \text{ CI } [1.70, 1.99]$). The subjective validity model successfully replicates this aggregate polarization without requiring the dampening factor ($M_{pre}$ = 0.37, $M_{post}$ = 0.56; $t(499) = 16.87$, $p < 2.2e-16$, $d = 0.75$, $95\% \text{ CI } [0.65, 0.85]$).
+
+Figures 7 and 8 visualize the pre- and post-discussion tendencies. Individual trajectories plotted in the background confirm simulation realism: despite the aggregate shift toward the pool bias, a minority of agents exhibit negative choice shifts due to stochastic exposure to dissonant argument subsets. 
+
+In the dampening model (Figure 7), an asymptotic scaling effect compresses post-discussion shifts as tendencies approach absolute limits ($\pm 1$), enforcing an artificial variance restriction. The subjective validity model (Figure 8) permits absolute polarization at $\pm 1$. Notably, the subjective validity model (Figure 8) displays a structural artifact where the pre-discussion median concentrates at 0.5. This occurs because the baseline tendency is calculated from exactly four unweighted binary arguments before dynamic weighting applies. Finally, the artificially high effect sizes simply confirm that the mathematical architecture successfully generates the theoretically predicted directional shifts. Calibrating parameters to replicate exact empirical magnitudes is not the objective of this study.
+
+\newpage
+
+\begin{flushleft}
+\textbf{Figure 7} \\
+\textit{Group Polarization Effect (Dampening Model)}
+\end{flushleft}
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align="center", fig.pos="H", out.width="100%", fig.cap=NULL}
+set.seed(111)
+simulation_C <- simulate_experiment(
+  n_groups = 50, 
+  n_agents_per_group = 10,
+  pool_size = 1000,
+  pool_bias = 0.4,
+  n_IA = 4,
+  n_AA = 12,
+  C = 4
+)
+
+plot_data <- simulation_C %>%
+  mutate(UniqueID = paste0("G", GroupID, "_A", AgentID)) %>%
+  select(UniqueID, T_pre, T_post) %>%
+  pivot_longer(
+    cols = c("T_pre", "T_post"), 
+    names_to = "Phase", 
+    values_to = "Value"
+  ) %>%
+  mutate(Phase = factor(Phase, levels = c("T_pre", "T_post")))
+
+set.seed(111)
+sampled_ids <- sample(unique(plot_data$UniqueID), 10)
+sampled_data <- plot_data %>% filter(UniqueID %in% sampled_ids)
+
+ggplot(plot_data, aes(x = Phase, y = Value)) +
+  theme_bw(base_size = 14) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_line(color = "grey90", linetype = "dashed"),
+    axis.text = element_text(color = "black")
+  ) +
+  geom_line(data = sampled_data, aes(group = UniqueID), color = "grey70", alpha = 0.5, linewidth = 0.6) +
+  geom_point(data = sampled_data, size = 2, color = "grey70", alpha = 0.6) +
+  geom_boxplot(fill = "white", color = "black", width = 0.4, outlier.shape = 1, linewidth = 0.6) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3.5, fill = "firebrick", color = "black", stroke = 1) +
+  stat_summary(fun = mean, geom = "text", aes(label = sprintf("%.2f", after_stat(y))), 
+               vjust = -4.0, color = "firebrick", fontface = "bold", size = 3.5) +
+  scale_y_continuous(limits = c(-1, 1), breaks = seq(-1, 1, 0.25)) +
+  scale_x_discrete(labels = c("Pre-Discussion", "Post-Discussion")) +
+  labs(y = "Opinion Tendency", x = NULL)
+```
+
+\begin{flushleft}
+\textit{Note.} Boxplot displaying pre- versus post-discussion distributions for the dampening model ($C = 4$). Red diamonds and the corresponding red numerical values denote the aggregate group means. Grey lines represent individual agent trajectories.
+\end{flushleft}
+
+\newpage
+
+\begin{flushleft}
+\textbf{Figure 8} \\
+\textit{Group Polarization Effect (Subjective Validity Model)}
+\end{flushleft}
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align="center", fig.pos="H", out.width="100%", fig.cap=NULL}
+set.seed(1)
+simulation_validity <- simulate_experiment_val(
+  n_groups = 50, 
+  n_agents_per_group = 10,
+  pool_size = 1000,
+  pool_bias = 0.4,
+  n_IA = 4,
+  n_AA = 12,
+  conf_bias_strength = 1.0
+)
+
+plot_data_validity <- simulation_validity %>%
+  mutate(UniqueID = paste0("G", GroupID, "_A", AgentID)) %>%
+  select(UniqueID, T_pre, T_post) %>%
+  pivot_longer(
+    cols = c("T_pre", "T_post"), 
+    names_to = "Phase", 
+    values_to = "Value"
+  ) %>%
+  mutate(Phase = factor(Phase, levels = c("T_pre", "T_post")))
+
+set.seed(123)
+sampled_ids_val <- sample(unique(plot_data_validity$UniqueID), 10)
+sampled_data_val <- plot_data_validity %>% filter(UniqueID %in% sampled_ids_val)
+
+ggplot(plot_data_validity, aes(x = Phase, y = Value)) +
+  theme_bw(base_size = 14) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_line(color = "grey90", linetype = "dashed"),
+    axis.text = element_text(color = "black")
+  ) +
+  geom_line(data = sampled_data_val, aes(group = UniqueID), color = "grey70", alpha = 0.5, linewidth = 0.6) +
+  geom_point(data = sampled_data_val, size = 2, color = "grey70", alpha = 0.6) +
+  geom_boxplot(fill = "white", color = "black", width = 0.4, outlier.shape = 1, linewidth = 0.6) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3.5, fill = "firebrick", color = "black", stroke = 1) +
+  stat_summary(fun = mean, geom = "text", aes(label = sprintf("%.2f", after_stat(y))), 
+               vjust = 2.5, color = "firebrick", fontface = "bold", size = 3.5) +
+  scale_y_continuous(limits = c(-1, 1), breaks = seq(-1, 1, 0.25)) +
+  scale_x_discrete(labels = c("Pre-Discussion", "Post-Discussion")) +
+  labs(y = "Opinion Tendency", x = NULL)
+```
+
+\begin{flushleft}
+\textit{Note.} Boxplot displaying pre- versus post-discussion distributions for the subjective validity model ($\beta = 1.0$). Red diamonds and the corresponding red numerical values denote the aggregate group means. Grey lines represent individual agent trajectories.
+\end{flushleft}
+
+# Discussion: Meta-Reflection
+
+The formalization relied on the meta-analytic review by @isenbergGroupPolarizationCritical1986, as alternative sources provided insufficient descriptions of Persuasive Arguments Theory (PAT) and the phenomenon of group polarization. Furthermore, the literature lacked explicit definitions separating individual choice shifts from aggregate group polarization, requiring indirect derivation and the exogenous introduction of macro-level variables ($\overline{T}^{pre}$, $\overline{T}^{post}$) for the VAST display. This significant gap-filling exposed the theory's computational ambiguities. To render the model executable, two structural deviations were implemented: a generative argument pool (Deviation 1) to operationalize stochastic sampling, and a dampening factor $C$ (Deviation 2) to artificially compensate for our initial oversimplification of PAT that omitted validity and novelty.
+
+Translating the verbal theory into the VAST display was the most significant operational difficulty, severely complicated by the need to map interacting individual and group levels. Formulating the mathematical deviations, such as the generative argument pool, was also highly challenging at first. However, critical self-reflection is required regarding the dampening factor $C$. Its implementation was only necessary because we oversimplified the theory at the wrong juncture by omitting dynamic validity weighting, rather than due to an inherent functional flaw in the original theoretical framework. In my individual contribution, I showed that a computational model incorporating the perceived validity of an argument is able to generate the phenomenon of group polarization.
+
+Ultimately, this formalization confirms that rigorous modeling is essential for psychology, as it reveals how the explanatory power of a theoretical framework can collapse through even minor simplifications of its underlying functional requirements.
+
+\newpage
+
+# References
+
+::: {#refs custom-style="Bibliography"}
+:::
+
+\newpage
+
+```{r table-a1, results="asis"}
+library(tibble)
+library(papaja)
+
+table_a1 <- tibble(
+  Reference = rep(c("Isenberg, D. J. (1986), p. 1141", "Isenberg, D. J. (1986), p. 1145", "Developed independently for completeness"), times = c(4, 12, 2)),
+  Quote = c(
+    "Group polarization is said to occur when an initial tendency of individual group members toward a given direction is enhanced following group discussion",
+    "Thus, on decisions in which group members have, on the average, a moderate proclivity in a given direction, group discussion results in a more extreme average proclivity in the same direction.",
+    "Thus, on decisions in which group members have, on the average, a moderate proclivity in a given direction, group discussion results in a more extreme average proclivity in the same direction.",
+    "Thus, on decisions in which group members have, on the average, a moderate proclivity in a given direction, group discussion results in a more extreme average proclivity in the same direction.",
+    "PAT holds that an individual's choice or position on an issue is a function of the number and persuasiveness of pro and con arguments that that person recalls from memory when formulating his or her own position.",
+    "PAT holds that an individual's choice or position on an issue is a function of the number and persuasiveness of pro and con arguments that that person recalls from memory when formulating his or her own position.",
+    "PAT holds that an individual's choice or position on an issue is a function of the number and persuasiveness of pro and con arguments that that person recalls from memory when formulating his or her own position.",
+    "PAT holds that an individual's choice or position on an issue is a function of the number and persuasiveness of pro and con arguments that that person recalls from memory when formulating his or her own position.",
+    "Group discussion will cause an individual to shift in a given direction to the extent that the discussion exposes that individual to persuasive arguments favoring that direction.",
+    "Group discussion will cause an individual to shift in a given direction to the extent that the discussion exposes that individual to persuasive arguments favoring that direction.",
+    "Group discussion will cause an individual to shift in a given direction to the extent that the discussion exposes that individual to persuasive arguments favoring that direction.",
+    "Group discussion will cause an individual to shift in a given direction to the extent that the discussion exposes that individual to persuasive arguments favoring that direction.",
+    "Two factors determine how persuasive a given argument will be. One factor is the perceived validity of the argument. How true is the argument? Does the argument fit into the person's previous views? Does the argument logically follow from accepted facts or assumptions?",
+    "Two factors determine how persuasive a given argument will be. One factor is the perceived validity of the argument. How true is the argument? Does the argument fit into the person's previous views? Does the argument logically follow from accepted facts or assumptions?",
+    "The second factor determining persuasiveness is the perceived novelty of the argument. Does the argument represent a new way of organizing information? Does the argument suggest new ideas? Does the argument increase the perceiver's access to additional information that is stored in memory?",
+    "The second factor determining persuasiveness is the perceived novelty of the argument. Does the argument represent a new way of organizing information? Does the argument suggest new ideas? Does the argument increase the perceiver's access to additional information that is stored in memory?",
+    "At the group level, there is an initial tendency with a moderate average proclivity, followed by a polarized tendency after the group discussion",
+    "At the group level, there is an initial tendency with a moderate average proclivity, followed by a polarized tendency after the group discussion"
+  ),
+  `Extracted element` = c(
+    "Group polarization",
+    "Initial Tendency of group members with a moderate average proclivity",
+    "Group Discussion",
+    "Resulting Tendency of group members with a more extreme average proclivity",
+    "Individual's initial arguments that the person recalls from memory [Initial argument set]",
+    "Number of arguments",
+    "Persuasiveness of pro and con [direction] arguments",
+    "Individual's initial choice or position (tendency) on an issue is a function of the number and persuasiveness of pro and con arguments that person recalls from memory",
+    "Additional persuasive arguments [following a group discussion]",
+    "[number of additional arguments person i considers after group discussion]",
+    "Individual (choice) shift",
+    "(Choice) shift is caused by exposition to persuasive arguments in a group discussion",
+    "persuasiveness of a given argument",
+    "one factor of persuasiveness is perceived validity of argument",
+    "second factor of persuasiveness is perceived novelty of argument",
+    "persuasiveness of other's arguments consists of validity and novelty of arguments",
+    "Initial Tendency of group with a moderate average proclivity",
+    "Tendency of group after group discussion"
+  ),
+  `Element type` = c(
+    "Phenomenon", "Concept", "Higher-order concept", "Concept", "Concept", "Concept", "Concept",
+    "Relationship", "Concept", "Concept", "Higher-order concept", "Relationship", "Concept", "Concept",
+    "Concept", "Relationship", "Concept", "Concept"
+  ),
+  `Short name` = c(
+    "GP", "$\\overline{T}_{i}^{pre}$", "GD", "$T_{i}^{post}$", "$IA_{i}$", "$n_{i}^{IA}$", "$d_{j}, p_{j}$",
+    "", "$AA_{i}$", "$n_{i}^{AA}$", "CS", "", "$p_{j}$", "$val_{j}$", "$nov_{j}$", "", "$\\overline{T}^{pre}$", "$\\overline{T}^{post}$"
+  ),
+  ID = 1:18,
+  `im VAST (Y/N)` = rep("Y", 18)
+)
+
+knitr::asis_output(
+  paste0(
+    "\\clearpage\n",
+    "\\setcounter{table}{0}\n",
+    "\\renewcommand{\\thetable}{A\\arabic{table}}\n",
+    "\\begin{landscape}\n",
+    "\\section*{Appendix A}\n\n",
+    apa_table(
+      table_a1,
+      caption = "Construct Source Table",
+      note = "Lists all references that constitute the original sources for the VAST display.",
+      align = c(">{\\raggedright\\arraybackslash}p{2.5cm}", ">{\\raggedright\\arraybackslash}p{6cm}",         ">{\\raggedright\\arraybackslash}p{2.5cm}", "p{2.5cm}", "p{2.0cm}", "c", "c"),
+      longtable = TRUE,
+      escape = FALSE
+    ),
+    "\\end{landscape}"
+  )
+)
+```
+
+```{r table-a2, results="asis"}
+library(tibble)
+library(papaja)
+
+table_a2 <- tibble(
+  Construct = c(
+    "Initial Tendency of group with a moderate average proclivity",
+    "Tendency of group after group discussion",
+    "Initial Tendency of group members with a moderate average proclivity",
+    "Resulting Tendency of group members with a more extreme average proclivity",
+    "Number of arguments",
+    "persuasiveness",
+    "direction"
+  ),
+  `Short Name` = c(
+    "$\\overline{T}^{pre}$",
+    "$\\overline{T}^{post}$",
+    "$T_{i}^{pre}$",
+    "$T_{i}^{post}$",
+    "$n_{i}^{IA}, n_{i}^{AA}$",
+    "$p_{j}$",
+    "$d_{j}$"
+  ),
+  `Scale level` = c(
+    "continuous",
+    "continuous",
+    "continuous",
+    "continuous",
+    "continuous / integer",
+    "continuous",
+    "dichotomous"
+  ),
+  `Range/Values` = c(
+    "$[-1;+1]$",
+    "$[-1;+1]$",
+    "$[-1;+1]$",
+    "$[-1;+1]$",
+    "$0; 1; 2; \\dots$ (discrete) $x \\in \\mathbb{N}_0$",
+    "$[0;1]$",
+    "$+1/-1$"
+  ),
+  Anchors = c(
+    "$-1=$ extremely negative opinion on a certain topic, $+1=$ extremely affirmative opinion on a certain topic",
+    "$-1=$ extremely negative opinion on a certain topic, $+1=$ extremely affirmative opinion on a certain topic",
+    "$-1=$ extremely negative opinion on a certain topic, $+1=$ extremely affirmative opinion on a certain topic",
+    "$-1=$ extremely negative opinion on a certain topic, $+1=$ extremely affirmative opinion on a certain topic",
+    "",
+    "$0=$ argument not persuasive at all, $1=$ argument maximally convincing",
+    "$-1=$ Contra Argument, $+1=$ Pro Argument"
+  )
+)
+
+knitr::asis_output(
+  paste0(
+    "\\clearpage\n",
+    "\\begin{landscape}\n",
+    papaja::apa_table(
+      table_a2,
+      caption = "Variable Table",
+      note = "Lists all concepts that are not higher-order concepts (because higher-order concepts typically are not reducible to a single metric).",
+      align = c(
+        ">{\\raggedright\\arraybackslash}p{4.5cm}",
+        ">{\\raggedright\\arraybackslash}p{2.5cm}",
+        ">{\\raggedright\\arraybackslash}p{2.5cm}",
+        ">{\\raggedright\\arraybackslash}p{3.5cm}",
+        ">{\\raggedright\\arraybackslash}p{6.5cm}"
+      ),
+      longtable = TRUE,
+      escape = FALSE
+    ),
+    "\\end{landscape}"
+  )
+)
+```
+
+```{r table-a3, results="asis"}
+library(tibble)
+library(papaja)
+
+table_a3 <- tibble(
+  `\\parbox[t]{2.0cm}{Output\\\\variable}` = c(
+    "$IA_{i}$",
+    "$AA_{i}$",
+    "$T_{i}^{post}$",
+    "$T_{i}^{pre}$",
+    "$\\overline{T}^{pre}$",
+    "$\\overline{T}^{post}$"
+  ),
+  `\\parbox[t]{6.5cm}{Function to compute\\\\the output variable}` = c(
+    "$IA_{i} = (a_{1}, a_{2}, \\dots, a_{n})$ mit $a_{j} = (d_{j}, p_{j})$ fuer $j=1, 2, \\dots, n$",
+    "$AA_{i} = (a_{n+1}, a_{n+2}, \\dots, a_{n+m})$ mit $a_{k} = (d_{k}, p_{k})$ fuer $k=n+1, n+2, \\dots, n+m$",
+    "$T_{i}^{post} = \\frac{1}{n_{i}^{IA}+n_{i}^{AA}} \\left( \\sum_{j\\in IA_{i}}p_{j}d_{j} + \\sum_{j\\in AA_{i}}p_{j}d_{j} \\right)$",
+    "$T_{i}^{pre} = \\frac{1}{n}\\sum_{j\\in IA_{i}}p_{j}d_{j}$",
+    "$\\overline{T}^{pre} = \\frac{1}{N}\\sum_{i=1}^{N}T_{i}^{pre}$",
+    "$\\overline{T}^{post} = \\overline{T}^{pre} + \\frac{1}{N}\\sum_{i=1}^{N}\\sum_{j\\in AA_{i}}p_{j}d_{j}$"
+  ),
+  Comment = c(
+    "",
+    "parallel to $IA_{i}$",
+    "",
+    "",
+    "",
+    ""
+  ),
+  `\\parbox[t]{3.5cm}{To what extent\\\\derived from\\\\theory?}` = c(
+    "Derived from theory",
+    "Loosely inspired by theory",
+    "Loosely inspired by theory",
+    "Loosely inspired by theory",
+    "Derived from theory",
+    "Derived from theory"
+  ),
+  `\\parbox[t]{3.5cm}{To what extent\\\\empirically\\\\backed?}` = c(
+    "ID 8",
+    "ID 9",
+    "ID 4",
+    "ID 2",
+    "ID 17",
+    "ID 18"
+  )
+)
+
+knitr::asis_output(
+  paste0(
+    "\\clearpage\n",
+    "\\begin{landscape}\n",
+    papaja::apa_table(
+      table_a3,
+      caption = "Relationships Table",
+     note = "Every variable in the VAST to which a one-sided arrow is pointing is a dependent (endogenous) variable. This table specifies a mathematical function for each endogenous variable, taking all incoming arrows as input variables. The theoretical justification is categorized as: dictated by theory (including reference IDs from the Construct Source Table), derived from theory, loosely inspired by theory, not based on focal theory but rather on common sense or other theories, or not at all.",
+      align = c(">{\\raggedright\\arraybackslash}p{2.0cm}", 
+                ">{\\raggedright\\arraybackslash}p{7cm}",
+                ">{\\raggedright\\arraybackslash}p{2.5cm}",
+                ">{\\raggedright\\arraybackslash}p{4cm}",
+                ">{\\raggedright\\arraybackslash}p{4cm}"),
+      longtable = TRUE,
+      escape = FALSE
+    ),
+    "\\end{landscape}"
+  )
+)
+```
